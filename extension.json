@@ -1,0 +1,54 @@
+{
+  "id": "gitlab",
+  "version": "0.1.0",
+  "api": 1,
+  "squadron": ">=0.54.0",
+  "name": { "en": "GitLab", "fr": "GitLab" },
+  "description": {
+    "en": "Merge requests and pipelines of your GitLab projects in Squadron, on gitlab.com or your own server: review, comment, merge",
+    "fr": "Les merge requests et les pipelines de vos projets GitLab dans Squadron, sur gitlab.com ou votre propre serveur : relire, commenter, fusionner"
+  },
+  "logo": "logo.svg",
+  "wasm": "target/wasm32-wasip2/release/gitlab.wasm",
+  "permissions": { "network": ["gitlab.com"] },
+  "contributes": {
+    "accounts": {
+      "label": { "en": "GitLab accounts", "fr": "Comptes GitLab" },
+      "check": true,
+      "fields": [
+        {
+          "id": "site",
+          "label": { "en": "GitLab address", "fr": "Adresse GitLab" },
+          "kind": "host",
+          "hint": {
+            "en": "gitlab.com, or the address of your GitLab server",
+            "fr": "gitlab.com, ou l’adresse de votre serveur GitLab"
+          }
+        },
+        {
+          "id": "token",
+          "label": { "en": "Personal access token", "fr": "Jeton d’accès personnel" },
+          "kind": "secret",
+          "hint": {
+            "en": "Create a token named Squadron with this scope, on gitlab.com or on your server",
+            "fr": "Créer un jeton nommé Squadron avec ce scope, sur gitlab.com ou sur votre serveur"
+          },
+          "copy": ["api"],
+          "url": "https://gitlab.com/-/user_settings/personal_access_tokens?name=Squadron&scopes=api"
+        }
+      ]
+    },
+    "forge": {
+      "remotes": [
+        "^(?<site>gitlab\\.com)/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)$",
+        "^(?<site>{account})/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)$"
+      ],
+      "links": [
+        "https?://(?<site>gitlab\\.com)/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)/-/merge_requests/(?<number>[0-9]+)",
+        "https?://(?<site>{account})/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)/-/merge_requests/(?<number>[0-9]+)"
+      ],
+      "calls": [],
+      "verdicts": ["approve", "comment"]
+    }
+  }
+}
