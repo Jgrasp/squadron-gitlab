@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.2.0 · 2026-11-20
+
+- La fusion d’une merge request propose de squasher ou non, selon ce que le projet permet, et de supprimer ou non la branche source
+- Les merge requests indiquent si leur branche source est protégée, et donc gardée par GitLab après la fusion
+
 ## 0.1.0 · 2026-11-20
 
 - Les merge requests de vos projets GitLab dans Squadron, sur gitlab.com ou votre propre serveur : celle de la branche de chaque agent, celles à relire, les vôtres et les autres, avec leur pipeline et leurs relecteurs

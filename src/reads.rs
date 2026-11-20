@@ -67,22 +67,40 @@ fn full_paths(repo: &Repo, iid: u64) -> [String; 3] {
 }
 
 pub fn fulls(repo: &Repo, iids: &[u64], me: &str) -> Result<Vec<(Pull, Value)>, String> {
-    let paths: Vec<String> = iids.iter().flat_map(|iid| full_paths(repo, *iid)).collect();
-    let mut found = api::each(&repo.account, &repo.site, &paths).into_iter();
+    let mut paths: Vec<String> = iids.iter().flat_map(|iid| full_paths(repo, *iid)).collect();
+    paths.push(repo.project());
+    let mut found = api::each(&repo.account, &repo.site, &paths);
+    let methods = pulls::merge_methods(&found.pop().and_then(Result::ok).unwrap_or_default());
+    let mut found = found.into_iter();
     let mut pulls = Vec::new();
     while let (Some(request), Some(reviewers), Some(approvals)) =
         (found.next(), found.next(), found.next())
     {
         let request = request?;
-        let pull = pulls::pull_of(
+        let mut pull = pulls::pull_of(
             &request,
             &reviewers.unwrap_or_default(),
             &approvals.unwrap_or_default(),
             me,
         );
+        pull.merge_methods = methods.clone();
         pulls.push((pull, request));
     }
     Ok(pulls)
+}
+
+pub fn branch_path(repo: &Repo, request: &Value) -> String {
+    let project = request["source_project_id"]
+        .as_u64()
+        .map(|id| format!("/projects/{id}"))
+        .unwrap_or_else(|| repo.project());
+    let branch = api::encode(&text(&request["source_branch"]));
+    format!("{project}/repository/branches/{branch}")
+}
+
+fn protected(repo: &Repo, request: &Value) -> bool {
+    repo.get(&branch_path(repo, request))
+        .is_ok_and(|found| found["protected"] == true)
 }
 
 fn iids(list: &Value) -> Vec<u64> {
@@ -110,7 +128,11 @@ pub fn pull(repo: &Repo, branch: &str) -> Result<Option<Pull>, String> {
         return Ok(None);
     };
     let me = username(repo).unwrap_or_default();
-    Ok(fulls(repo, &[iid], &me)?.pop().map(|(pull, _)| pull))
+    let Some((mut pull, found)) = fulls(repo, &[iid], &me)?.pop() else {
+        return Ok(None);
+    };
+    pull.branch_protected = protected(repo, &found);
+    Ok(Some(pull))
 }
 
 pub fn changed_files(found: &Value) -> Option<u64> {
@@ -122,9 +144,10 @@ pub fn changed_files(found: &Value) -> Option<u64> {
 
 pub fn numbered(repo: &Repo, number: u64) -> Result<Numbered, String> {
     let me = username(repo).unwrap_or_default();
-    let (pull, found) = fulls(repo, &[number], &me)?
+    let (mut pull, found) = fulls(repo, &[number], &me)?
         .pop()
         .ok_or_else(|| format!("GitLab has no merge request {number}."))?;
+    pull.branch_protected = protected(repo, &found);
     Ok(Numbered {
         pull,
         files: changed_files(&found),
@@ -446,6 +469,26 @@ mod tests {
             ("gitlab.com".into(), "grp/sub/proj".into())
         );
         assert!(site_and_path("gitlab.com/alone", &BTreeMap::new()).is_err());
+    }
+
+    #[test]
+    fn asks_for_the_source_branch_in_its_own_project() {
+        let repo = Repo {
+            account: "a1".into(),
+            site: "gitlab.com".into(),
+            path: "grp/proj".into(),
+        };
+        assert_eq!(
+            branch_path(
+                &repo,
+                &json!({ "source_project_id": 42, "source_branch": "feat/x" })
+            ),
+            "/projects/42/repository/branches/feat%2Fx"
+        );
+        assert_eq!(
+            branch_path(&repo, &json!({ "source_branch": "main" })),
+            "/projects/grp%2Fproj/repository/branches/main"
+        );
     }
 
     #[test]

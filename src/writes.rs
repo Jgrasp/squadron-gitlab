@@ -1,7 +1,9 @@
 use crate::api;
 use crate::reads::{self, Repo};
 use serde_json::{Map, Value, json};
-use squadron_extension_api::forge::{Draft, PostArgs, Posted, ReplyArgs, ResolveArgs, UpdateArgs};
+use squadron_extension_api::forge::{
+    Draft, MergeArgs, PostArgs, Posted, ReplyArgs, ResolveArgs, UpdateArgs,
+};
 
 pub const NO_REQUEST_CHANGES: &str =
     "The comments are on GitLab, but Squadron cannot request changes there: do it on GitLab.";
@@ -91,14 +93,31 @@ pub fn post(repo: &Repo, args: &PostArgs) -> Result<Posted, String> {
     })
 }
 
-pub fn merge(repo: &Repo, number: u64) -> Result<(), String> {
-    send(
-        repo,
-        "PUT",
-        &format!("{}/merge", repo.request(number)),
-        None,
-    )
-    .map(|_| ())
+pub fn merge_options(args: &MergeArgs) -> Value {
+    let mut options = Map::new();
+    if let Some(method) = &args.method {
+        options.insert("squash".into(), json!(method == "squash"));
+    }
+    if let Some(delete) = args.delete_branch {
+        options.insert("should_remove_source_branch".into(), json!(delete));
+    }
+    Value::Object(options)
+}
+
+pub fn merge_steps(path: &str, args: &MergeArgs) -> Vec<(String, Value)> {
+    let mut steps = Vec::new();
+    if args.method.as_deref().is_some_and(|m| m != "squash") {
+        steps.push((path.to_string(), json!({ "squash": false })));
+    }
+    steps.push((format!("{path}/merge"), merge_options(args)));
+    steps
+}
+
+pub fn merge(repo: &Repo, args: &MergeArgs) -> Result<(), String> {
+    for (path, body) in merge_steps(&repo.request(args.number), args) {
+        send(repo, "PUT", &path, Some(body))?;
+    }
+    Ok(())
 }
 
 pub fn changes(args: &UpdateArgs) -> Value {
@@ -151,6 +170,33 @@ mod tests {
             draft_of(&draft("", 0, false, "Add a test."), &refs),
             ("notes", json!({ "body": "Add a test." }))
         );
+    }
+
+    #[test]
+    fn merges_with_the_chosen_squash_and_branch_deletion() {
+        let args = |method: Option<&str>, delete_branch| MergeArgs {
+            number: 3,
+            method: method.map(str::to_string),
+            delete_branch,
+        };
+        assert_eq!(merge_options(&args(None, None)), json!({}));
+        assert_eq!(
+            merge_options(&args(Some("squash"), Some(true))),
+            json!({ "squash": true, "should_remove_source_branch": true })
+        );
+        assert_eq!(
+            merge_options(&args(Some("rebase"), Some(false))),
+            json!({ "squash": false, "should_remove_source_branch": false })
+        );
+        let paths = |method| {
+            merge_steps("/mr/3", &args(method, None))
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(paths(Some("merge")), ["/mr/3", "/mr/3/merge"]);
+        assert_eq!(paths(Some("squash")), ["/mr/3/merge"]);
+        assert_eq!(paths(None), ["/mr/3/merge"]);
     }
 
     #[test]
