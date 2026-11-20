@@ -101,17 +101,12 @@ pub fn get(account: &str, site: &str, path: &str) -> Result<Response, String> {
     host::fetch(&request("GET", url(site, path), account, None))
 }
 
-// shortcut: one request after the other, until the API's host::fetch_many sends them at once.
-fn fetch_many(requests: &[Request]) -> Vec<Result<Response, String>> {
-    requests.iter().map(host::fetch).collect()
-}
-
 pub fn each(account: &str, site: &str, paths: &[String]) -> Vec<Result<Value, String>> {
     let requests: Vec<Request> = paths
         .iter()
         .map(|path| request("GET", url(site, path), account, None))
         .collect();
-    fetch_many(&requests)
+    host::fetch_many(&requests)
         .into_iter()
         .map(|found| found.and_then(answer))
         .collect()
