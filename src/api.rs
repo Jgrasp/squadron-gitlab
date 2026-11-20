@@ -50,16 +50,19 @@ pub fn encode(text: &str) -> String {
         .collect()
 }
 
-pub fn url(site: &str, path: &str, query: &[(&str, &str)]) -> String {
-    let base = format!("https://{site}/api/v4{path}");
+pub fn query(path: &str, query: &[(&str, &str)]) -> String {
     if query.is_empty() {
-        return base;
+        return path.into();
     }
     let query: Vec<String> = query
         .iter()
         .map(|(k, v)| format!("{}={}", encode(k), encode(v)))
         .collect();
-    format!("{base}?{}", query.join("&"))
+    format!("{path}?{}", query.join("&"))
+}
+
+pub fn url(site: &str, path: &str) -> String {
+    format!("https://{site}/api/v4{path}")
 }
 
 pub fn request(method: &str, url: String, account: &str, body: Option<String>) -> Request {
@@ -83,12 +86,11 @@ pub fn send(
     site: &str,
     method: &str,
     path: &str,
-    query: &[(&str, &str)],
     body: Option<Value>,
 ) -> Result<Value, String> {
     let request = request(
         method,
-        url(site, path, query),
+        url(site, path),
         account,
         body.map(|b| b.to_string()),
     );
@@ -96,7 +98,23 @@ pub fn send(
 }
 
 pub fn get(account: &str, site: &str, path: &str) -> Result<Response, String> {
-    host::fetch(&request("GET", url(site, path, &[]), account, None))
+    host::fetch(&request("GET", url(site, path), account, None))
+}
+
+// shortcut: one request after the other, until the API's host::fetch_many sends them at once.
+fn fetch_many(requests: &[Request]) -> Vec<Result<Response, String>> {
+    requests.iter().map(host::fetch).collect()
+}
+
+pub fn each(account: &str, site: &str, paths: &[String]) -> Vec<Result<Value, String>> {
+    let requests: Vec<Request> = paths
+        .iter()
+        .map(|path| request("GET", url(site, path), account, None))
+        .collect();
+    fetch_many(&requests)
+        .into_iter()
+        .map(|found| found.and_then(answer))
+        .collect()
 }
 
 pub fn refused() -> String {
@@ -161,13 +179,15 @@ mod tests {
         assert_eq!(
             url(
                 "gitlab.com",
-                "/projects/grp%2Fsub%2Fproj/merge_requests",
-                &[("source_branch", "feat/x y"), ("per_page", "1")]
+                &query(
+                    "/projects/grp%2Fsub%2Fproj/merge_requests",
+                    &[("source_branch", "feat/x y"), ("per_page", "1")]
+                )
             ),
             "https://gitlab.com/api/v4/projects/grp%2Fsub%2Fproj/merge_requests?source_branch=feat%2Fx%20y&per_page=1"
         );
         assert_eq!(
-            url("git.acme.io", "/user", &[]),
+            url("git.acme.io", &query("/user", &[])),
             "https://git.acme.io/api/v4/user"
         );
     }
@@ -196,7 +216,7 @@ mod tests {
     fn asks_squadron_for_the_token_of_the_account() {
         let sent = request(
             "POST",
-            url("gitlab.com", "/user", &[]),
+            url("gitlab.com", "/user"),
             "acc1",
             Some("{}".into()),
         );

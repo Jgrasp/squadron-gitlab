@@ -1,10 +1,48 @@
 use serde_json::{Value, json};
-use squadron_extension_api::forge;
-use squadron_extension_api::{Account, Extension, squadron_extension};
+use squadron_extension_api::forge::{self, BranchArgs, Input, NoArgs, NumberArgs};
+use squadron_extension_api::{Account, Agent, Extension, host, squadron_extension};
 
 mod api;
+mod pulls;
+mod reads;
+
+use reads::Repo;
 
 struct GitLab;
+
+fn on_repo<A, T>(
+    input: &str,
+    work: impl Fn(&Repo, &A) -> Result<T, String>,
+) -> Result<String, String>
+where
+    A: Default + serde::de::DeserializeOwned,
+    T: serde::Serialize,
+{
+    let asked: Input<A> = forge::input(input)?;
+    let (site, path) = reads::site_and_path(&asked.repo, &asked.groups)?;
+    let group = path.split('/').next().unwrap_or_default().to_lowercase();
+    let key = format!("group:{site}/{group}");
+    let known = host::state_get(&key);
+    let mut last = String::new();
+    for account in api::ordered(api::accounts(&site)?, known.clone()) {
+        let repo = Repo {
+            account: account.clone(),
+            site: site.clone(),
+            path: path.clone(),
+        };
+        match work(&repo, &asked.args) {
+            Ok(found) => {
+                if known.as_deref() != Some(&account) {
+                    host::state_set(&key, Some(&account));
+                }
+                return forge::answer(&found);
+            }
+            Err(error) if api::denied(&error) => last = error,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last)
+}
 
 fn checked(status: u16, body: &str) -> Result<String, String> {
     let user: Value = serde_json::from_str(body).unwrap_or_default();
@@ -37,14 +75,36 @@ fn checked(status: u16, body: &str) -> Result<String, String> {
 }
 
 impl Extension for GitLab {
+    fn on_event(name: String, _agent: Option<Agent>, _data: String) {
+        if name == "accounts.changed" {
+            for account in host::accounts() {
+                host::state_set(&reads::username_key(&account.id), None);
+            }
+        }
+    }
+
     fn check_account(account: Account) -> Result<String, String> {
         let site = api::site_of(&account.fields);
         let me = api::get(&account.id, &site, "/user")?;
         checked(me.status, &me.body)
     }
 
-    fn forge(call: String, _input: String) -> Result<String, String> {
-        Err(forge::unsupported(&call))
+    fn forge(call: String, input: String) -> Result<String, String> {
+        match call.as_str() {
+            "pull" => on_repo(&input, |repo, args: &BranchArgs| {
+                reads::pull(repo, &args.branch)
+            }),
+            "numbered" => on_repo(&input, |repo, args: &NumberArgs| {
+                reads::numbered(repo, args.number)
+            }),
+            "lists" => on_repo(&input, |repo, _: &NoArgs| reads::lists(repo)),
+            "remarks" => on_repo(&input, |repo, args: &NumberArgs| {
+                reads::remarks(repo, args.number)
+            }),
+            "me" => on_repo(&input, |repo, _: &NoArgs| reads::me(repo)),
+            "runs" => on_repo(&input, |repo, _: &NoArgs| reads::runs(repo)),
+            _ => Err(forge::unsupported(&call)),
+        }
     }
 }
 
