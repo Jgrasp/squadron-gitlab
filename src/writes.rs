@@ -170,14 +170,23 @@ pub fn already_open(error: String, branch: &str) -> String {
     )
 }
 
+pub fn opened(
+    args: &CreateArgs,
+    post: impl FnOnce(Value) -> Result<Value, String>,
+    read: impl FnOnce(u64) -> Result<Pull, String>,
+) -> Result<Pull, String> {
+    let made = post(opening(args)).map_err(|error| already_open(error, &args.branch))?;
+    let iid = made["iid"].as_u64().unwrap_or_default();
+    Ok(read(iid).unwrap_or_else(|_| pulls::pull_of(&made, &Value::Null, &Value::Null, "")))
+}
+
 pub fn create(repo: &Repo, args: &CreateArgs) -> Result<Pull, String> {
     let path = format!("{}/merge_requests", repo.project());
-    let made = send(repo, "POST", &path, Some(opening(args)))
-        .map_err(|error| already_open(error, &args.branch))?;
-    let iid = made["iid"].as_u64().unwrap_or_default();
-    Ok(reads::numbered(repo, iid)
-        .map(|found| found.pull)
-        .unwrap_or_else(|_| pulls::pull_of(&made, &Value::Null, &Value::Null, "")))
+    opened(
+        args,
+        |body| send(repo, "POST", &path, Some(body)),
+        |iid| reads::numbered(repo, iid).map(|found| found.pull),
+    )
 }
 
 #[cfg(test)]
@@ -301,5 +310,61 @@ mod tests {
         assert!(error["title"]["fr"].is_string() && error["detail"]["fr"].is_string());
         let other = "GitLab answered 422: Validation failed".to_string();
         assert_eq!(already_open(other.clone(), "feat/x"), other);
+    }
+
+    #[test]
+    fn creates_the_merge_request_and_answers_its_pull() {
+        let args = CreateArgs {
+            branch: "feat/x".into(),
+            base: "main".into(),
+            title: "Export".into(),
+            description: "Sends **the ledger**".into(),
+            draft: true,
+        };
+        let made = json!({ "iid": 7, "title": "Draft: Export", "state": "opened", "draft": true, "source_branch": "feat/x", "target_branch": "main", "web_url": "https://gitlab.com/acme/shop/-/merge_requests/7" });
+        let mut sent = Value::Null;
+        let read = opened(
+            &args,
+            |body| {
+                sent = body;
+                Ok(made.clone())
+            },
+            |iid| {
+                Ok(Pull {
+                    number: iid,
+                    draft: true,
+                    ..Pull::default()
+                })
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            sent,
+            json!({ "source_branch": "feat/x", "target_branch": "main", "title": "Draft: Export", "description": "Sends **the ledger**" })
+        );
+        assert_eq!((read.number, read.draft), (7, true));
+        let unread = opened(
+            &args,
+            |_| Ok(made.clone()),
+            |_| Err("GitLab answered 404".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                unread.number,
+                unread.draft,
+                unread.state.as_str(),
+                unread.branch.as_str(),
+                unread.base.as_str()
+            ),
+            (7, true, "open", "feat/x", "main")
+        );
+        let refused = opened(
+            &args,
+            |_| Err("GitLab answered 409: [\"Another open merge request already exists for this source branch: !6\"]".into()),
+            |_| unreachable!(),
+        )
+        .unwrap_err();
+        assert!(refused.contains("already open for feat/x"));
     }
 }
