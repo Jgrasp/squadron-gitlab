@@ -1,10 +1,13 @@
 use serde_json::{Value, json};
-use squadron_extension_api::forge::{self, BranchArgs, Input, NoArgs, NumberArgs};
+use squadron_extension_api::forge::{
+    self, BranchArgs, Input, NoArgs, NumberArgs, PostArgs, ReplyArgs, ResolveArgs, UpdateArgs,
+};
 use squadron_extension_api::{Account, Agent, Extension, host, squadron_extension};
 
 mod api;
 mod pulls;
 mod reads;
+mod writes;
 
 use reads::Repo;
 
@@ -103,6 +106,15 @@ impl Extension for GitLab {
             }),
             "me" => on_repo(&input, |repo, _: &NoArgs| reads::me(repo)),
             "runs" => on_repo(&input, |repo, _: &NoArgs| reads::runs(repo)),
+            "reply" => on_repo(&input, |repo, args: &ReplyArgs| writes::reply(repo, args)),
+            "resolve" => on_repo(&input, |repo, args: &ResolveArgs| {
+                writes::resolve(repo, args)
+            }),
+            "post" => on_repo(&input, |repo, args: &PostArgs| writes::post(repo, args)),
+            "merge" => on_repo(&input, |repo, args: &NumberArgs| {
+                writes::merge(repo, args.number)
+            }),
+            "update" => on_repo(&input, |repo, args: &UpdateArgs| writes::update(repo, args)),
             _ => Err(forge::unsupported(&call)),
         }
     }
