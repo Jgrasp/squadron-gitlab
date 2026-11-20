@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.3.0 · 2026-11-20
+
+- Ouvrez une merge request depuis Squadron une fois la branche d’un agent poussée, en brouillon si vous le souhaitez
+
 ## 0.2.0 · 2026-11-20
 
 - La fusion d’une merge request propose de squasher ou non, selon ce que le projet permet, et de supprimer ou non la branche source
