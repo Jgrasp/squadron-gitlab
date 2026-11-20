@@ -1,6 +1,7 @@
 use serde_json::{Value, json};
 use squadron_extension_api::forge::{
-    self, BranchArgs, Input, NoArgs, NumberArgs, PostArgs, ReplyArgs, ResolveArgs, UpdateArgs,
+    self, BranchArgs, Input, MergeArgs, NoArgs, NumberArgs, PostArgs, ReplyArgs, ResolveArgs,
+    UpdateArgs,
 };
 use squadron_extension_api::{Account, Agent, Extension, host, squadron_extension};
 
@@ -111,9 +112,7 @@ impl Extension for GitLab {
                 writes::resolve(repo, args)
             }),
             "post" => on_repo(&input, |repo, args: &PostArgs| writes::post(repo, args)),
-            "merge" => on_repo(&input, |repo, args: &NumberArgs| {
-                writes::merge(repo, args.number)
-            }),
+            "merge" => on_repo(&input, |repo, args: &MergeArgs| writes::merge(repo, args)),
             "update" => on_repo(&input, |repo, args: &UpdateArgs| writes::update(repo, args)),
             _ => Err(forge::unsupported(&call)),
         }

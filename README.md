@@ -12,7 +12,7 @@ Every project whose `origin` is on `gitlab.com` or on the server of one of your 
 
 - the merge request of each agent's branch, and chips for the merge request links in conversations;
 - the merge requests to review, yours and the others, with their pipeline and reviewers;
-- reviews with line comments, a summary and an approval, replies to remarks, resolved threads, merges, and title and description changes, from you or from an agent;
+- reviews with line comments, a summary and an approval, replies to remarks, resolved threads, merges with the squash and source branch deletion the project allows, and title and description changes, from you or from an agent;
 - the pipelines, with a notification when one ends.
 
 GitLab has no "request changes" verdict for Squadron: a review either approves or comments.

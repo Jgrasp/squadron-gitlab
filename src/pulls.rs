@@ -23,6 +23,28 @@ fn checks(pipeline: &Value) -> Option<String> {
     Some(state.into())
 }
 
+pub fn merge_methods(project: &Value) -> Vec<String> {
+    let whole = match project["merge_method"].as_str() {
+        Some("merge" | "rebase_merge") => "merge",
+        Some("ff") => "rebase",
+        _ => return Vec::new(),
+    };
+    let methods: &[&str] = match project["squash_option"].as_str() {
+        Some("never") => &[whole],
+        Some("always") => &["squash"],
+        Some("default_on" | "default_off") => &[whole, "squash"],
+        _ => return Vec::new(),
+    };
+    methods.iter().map(|m| m.to_string()).collect()
+}
+
+fn delete_branch(found: &Value) -> Option<bool> {
+    let chosen = |key: &str| found[key].as_bool();
+    found.get("force_remove_source_branch").map(|_| {
+        chosen("should_remove_source_branch").or(chosen("force_remove_source_branch")) == Some(true)
+    })
+}
+
 pub fn pull_of(found: &Value, reviewers: &Value, approvals: &Value, me: &str) -> Pull {
     let approved: Vec<&Value> = approvals["approved_by"]
         .as_array()
@@ -97,6 +119,9 @@ pub fn pull_of(found: &Value, reviewers: &Value, approvals: &Value, me: &str) ->
             })
             .collect(),
         conflicts: found["has_conflicts"] == true,
+        delete_branch: delete_branch(found),
+        delete_branch_settable: true,
+        ..Pull::default()
     }
 }
 
@@ -163,6 +188,46 @@ mod tests {
         let mut merged = found.clone();
         merged["state"] = json!("merged");
         assert!(!pull_of(&merged, &Value::Null, &Value::Null, "").mergeable);
+    }
+
+    #[test]
+    fn offers_the_merge_methods_the_project_allows() {
+        let methods = |merge: &str, squash: &str| {
+            merge_methods(&json!({ "merge_method": merge, "squash_option": squash }))
+        };
+        assert_eq!(methods("merge", "default_off"), ["merge", "squash"]);
+        assert_eq!(methods("merge", "default_on"), ["merge", "squash"]);
+        assert_eq!(methods("merge", "never"), ["merge"]);
+        assert_eq!(methods("merge", "always"), ["squash"]);
+        assert_eq!(methods("rebase_merge", "never"), ["merge"]);
+        assert_eq!(methods("ff", "default_on"), ["rebase", "squash"]);
+        assert_eq!(methods("ff", "always"), ["squash"]);
+        assert!(methods("other", "never").is_empty());
+        assert!(merge_methods(&json!({ "merge_method": "merge" })).is_empty());
+        assert!(merge_methods(&Value::Null).is_empty());
+    }
+
+    #[test]
+    fn tells_whether_merging_deletes_the_branch() {
+        let deletes = |found: Value| pull_of(&found, &Value::Null, &Value::Null, "").delete_branch;
+        assert_eq!(deletes(json!({})), None);
+        assert_eq!(
+            deletes(
+                json!({ "force_remove_source_branch": null, "should_remove_source_branch": null })
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            deletes(json!({ "force_remove_source_branch": true })),
+            Some(true)
+        );
+        assert_eq!(
+            deletes(
+                json!({ "force_remove_source_branch": true, "should_remove_source_branch": false })
+            ),
+            Some(false)
+        );
+        assert!(pull_of(&json!({}), &Value::Null, &Value::Null, "").delete_branch_settable);
     }
 
     #[test]
