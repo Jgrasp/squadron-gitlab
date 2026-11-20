@@ -37,7 +37,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "gitlab"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "regex",
  "serde",
@@ -221,8 +221,8 @@ dependencies = [
 
 [[package]]
 name = "squadron_extension_api"
-version = "1.13.0"
-source = "git+https://github.com/Jgrasp/squadron-extensions#ea441b5c1bbc027e0661d9a4dbc87a9cd811b857"
+version = "1.14.0"
+source = "git+https://github.com/Jgrasp/squadron-extensions#08fda96c70eb9f7702d73100dff6daa6d00765bd"
 dependencies = [
  "serde",
  "serde_json",

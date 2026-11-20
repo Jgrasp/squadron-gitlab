@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 · 2026-11-20
+
+- Open a merge request from Squadron once an agent pushed its branch, as a draft if you like
+
 ## 0.2.0 · 2026-11-20
 
 - Merging a merge request offers squash or not, as the project allows it, and whether to delete the source branch

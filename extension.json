@@ -1,6 +1,6 @@
 {
   "id": "gitlab",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "api": 1,
   "squadron": ">=0.56.0",
   "name": { "en": "GitLab", "fr": "GitLab" },
@@ -47,7 +47,7 @@
         "https?://(?<site>gitlab\\.com)/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)/-/merge_requests/(?<number>[0-9]+)",
         "https?://(?<site>{account})/(?<path>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)/-/merge_requests/(?<number>[0-9]+)"
       ],
-      "calls": ["pull", "numbered", "lists", "remarks", "me", "reply", "resolve", "post", "merge", "update", "runs"],
+      "calls": ["pull", "numbered", "lists", "remarks", "me", "reply", "resolve", "post", "merge", "update", "create", "runs"],
       "verdicts": ["approve", "comment"]
     }
   }

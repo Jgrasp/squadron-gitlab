@@ -10,7 +10,7 @@ Add one account per GitLab server. Several accounts on the same server work too:
 
 Every project whose `origin` is on `gitlab.com` or on the server of one of your accounts then gets, in Squadron:
 
-- the merge request of each agent's branch, and chips for the merge request links in conversations;
+- the merge request of each agent's branch, opened from Squadron once the branch is pushed, as a draft if you like, and chips for the merge request links in conversations;
 - the merge requests to review, yours and the others, with their pipeline and reviewers;
 - reviews with line comments, a summary and an approval, replies to remarks, resolved threads, merges with the squash and source branch deletion the project allows, and title and description changes, from you or from an agent;
 - the pipelines, with a notification when one ends.
@@ -21,7 +21,7 @@ GitLab has no "request changes" verdict for Squadron: a review either approves o
 
 - HTTPS requests to `gitlab.com`, and to the server you typed in each account, for GitLab's API.
 - GitLab accounts: each token stays in the system keyring. Squadron adds it to the requests to that account's server only, and the extension never reads it.
-  - `api` reads the merge requests, their discussions, approvals and pipelines, tells which ones you review or wrote, shows your name and avatar, and comments, approves, merges and edits them.
+  - `api` reads the merge requests, their discussions, approvals and pipelines, tells which ones you review or wrote, shows your name and avatar, and opens, comments, approves, merges and edits them.
 
 ## Build
 
