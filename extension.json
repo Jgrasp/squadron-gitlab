@@ -2,7 +2,7 @@
   "id": "gitlab",
   "version": "0.1.0",
   "api": 1,
-  "squadron": ">=0.56.0",
+  "squadron": ">=0.57.0",
   "name": { "en": "GitLab", "fr": "GitLab" },
   "description": {
     "en": "Merge requests and pipelines of your GitLab projects in Squadron, on gitlab.com or your own server: review, comment, merge",
