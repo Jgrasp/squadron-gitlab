@@ -104,14 +104,20 @@ pub fn merge_options(args: &MergeArgs) -> Value {
     Value::Object(options)
 }
 
+pub fn merge_steps(path: &str, args: &MergeArgs) -> Vec<(String, Value)> {
+    let mut steps = Vec::new();
+    if args.method.as_deref().is_some_and(|m| m != "squash") {
+        steps.push((path.to_string(), json!({ "squash": false })));
+    }
+    steps.push((format!("{path}/merge"), merge_options(args)));
+    steps
+}
+
 pub fn merge(repo: &Repo, args: &MergeArgs) -> Result<(), String> {
-    send(
-        repo,
-        "PUT",
-        &format!("{}/merge", repo.request(args.number)),
-        Some(merge_options(args)),
-    )
-    .map(|_| ())
+    for (path, body) in merge_steps(&repo.request(args.number), args) {
+        send(repo, "PUT", &path, Some(body))?;
+    }
+    Ok(())
 }
 
 pub fn changes(args: &UpdateArgs) -> Value {
@@ -182,6 +188,15 @@ mod tests {
             merge_options(&args(Some("rebase"), Some(false))),
             json!({ "squash": false, "should_remove_source_branch": false })
         );
+        let paths = |method| {
+            merge_steps("/mr/3", &args(method, None))
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(paths(Some("merge")), ["/mr/3", "/mr/3/merge"]);
+        assert_eq!(paths(Some("squash")), ["/mr/3/merge"]);
+        assert_eq!(paths(None), ["/mr/3/merge"]);
     }
 
     #[test]
