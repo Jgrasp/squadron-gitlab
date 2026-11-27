@@ -1,6 +1,6 @@
 # GitLab
 
-A [Squadron](https://github.com/Jgrasp/squadron) extension that brings the merge requests and pipelines of your GitLab projects into Squadron, on gitlab.com or on your own GitLab server.
+A [Squadron](https://github.com/akki-team/squadron) extension that brings the merge requests and pipelines of your GitLab projects into Squadron, on gitlab.com or on your own GitLab server.
 
 ## Use
 
